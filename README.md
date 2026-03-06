@@ -1,2 +1,39 @@
-# GPSFlightTracker
-This project utilizes a GPS module for positioning and a BMP280 barometric pressure sensor for high-precision altitude data. The system captures real-time flight metrics to help pilots to evaluate level flight stability and perform detailed flying pattern analysis.
+# RC Flight Tracker & Logger
+A high-precision flight data logging system for RC aircraft built on the ESP8266. This device captures 3D flight paths by fusing GPS coordinates with barometric altitude data from a BMP280, then serves the data over a local WiFi portal.
+
+# Features
+* Dual-Sensor Data: High-accuracy horizontal GPS positioning paired with ±1 meter vertical precision via the BMP280 pressure sensor.
+* Auto-KML Generation: Logs are saved directly in .kml format, ready to be dropped into Google Earth for 3D flight visualization.
+* Wireless Data Access: Integrated Web Server allows you to download or delete flight logs from your smartphone at the field—no SD card removal required.
+* Status Intelligence: LED signaling for GPS fix status, satellite count, and recording activity.
+
+# Hardware Configuration
+The system uses the following pin mapping for ESP8266 (e.g., NodeMCU/Wemos D1 Mini):
+
+| Component | Pin | ESP8266 Pin | Function |
+| GPS TX | 12 | D6 | Serial Data Input |
+| GPS RX | 13 | D7 | Serial Data Output |
+| BMP280 SDA | 4 | D2 | I2C Data |
+| BMP280 SCL | 5 | D1 | I2C Clock |
+| Rec Switch | 0 | D3 | Toggle Logging (Active LOW) |
+| WiFi Switch | 2 | D4 | Toggle AP Mode (Active LOW) |
+| Status LED | 14 | D5 | Visual Feedback |
+
+# How to Use
+1. Recording a Flight
+   1. Power on the device. The LED will flash rapidly while searching for a GPS fix.
+   2. Once a fix is established (4+ satellites), the LED turns solid.
+   3. Flip the Record Switch (D3). The LED will blink slowly, indicating the flight path is being saved to the internal LittleFS storage.
+   4. Flip the switch back to stop recording and finalize the .kml file.
+
+2. Retrieving Data
+   1. Flip the WiFi Switch (D4).
+   2. Connect your phone/laptop to the WiFi network: RC_FLIGHT_DATA (Password: 12345678).
+   3. Navigate to 192.168.4.1 in your browser.
+   4. Download your flight files and open them in Google Earth to analyze your flying patterns and level flight stability.
+
+# Project Structure
+* LittleFS: Used for robust on-chip file storage.
+* TinyGPS++: Handles NMEA sentence parsing.
+* Adafruit_BMP280: Manages altitude sensing relative to the takeoff point (baseline).
+* ESP8266WebServer: Serves the mobile-friendly download portal.
