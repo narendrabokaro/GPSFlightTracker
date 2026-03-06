@@ -7,18 +7,6 @@ A high-precision flight data logging system for RC aircraft built on the ESP8266
 * Wireless Data Access: Integrated Web Server allows you to download or delete flight logs from your smartphone at the field—no SD card removal required.
 * Status Intelligence: LED signaling for GPS fix status, satellite count, and recording activity.
 
-# Hardware Configuration
-The system uses the following pin mapping for ESP8266 (e.g., NodeMCU/Wemos D1 Mini):
-
-| Component | Pin | ESP8266 Pin | Function |
-| GPS TX | 12 | D6 | Serial Data Input |
-| GPS RX | 13 | D7 | Serial Data Output |
-| BMP280 SDA | 4 | D2 | I2C Data |
-| BMP280 SCL | 5 | D1 | I2C Clock |
-| Rec Switch | 0 | D3 | Toggle Logging (Active LOW) |
-| WiFi Switch | 2 | D4 | Toggle AP Mode (Active LOW) |
-| Status LED | 14 | D5 | Visual Feedback |
-
 # How to Use
 1. Recording a Flight
    1. Power on the device. The LED will flash rapidly while searching for a GPS fix.
