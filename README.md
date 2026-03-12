@@ -25,3 +25,6 @@ A high-precision flight data logging system for RC aircraft built on the ESP8266
 * TinyGPS++: Handles NMEA sentence parsing.
 * Adafruit_BMP280: Manages altitude sensing relative to the takeoff point (baseline).
 * ESP8266WebServer: Serves the mobile-friendly download portal.
+
+# Project field trial pictures
+
