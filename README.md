@@ -27,4 +27,4 @@ A high-precision flight data logging system for RC aircraft built on the ESP8266
 * ESP8266WebServer: Serves the mobile-friendly download portal.
 
 # Project field trial pictures
-
+![Project image](10001144309024118626637844509.png)
