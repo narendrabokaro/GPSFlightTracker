@@ -34,7 +34,7 @@ char password[] = "12345678";
 
 // In milliseconds
 unsigned long debugMessagePrintFreq = 5000;
-unsigned long loggingInterval = 500;
+unsigned long loggingInterval = 200;
 
 // --- WEB SERVER FUNCTIONS ---
 void handleRoot() {
@@ -75,9 +75,21 @@ void handleDelete() {
 
 void setup() {
   Serial.begin(115200);
-  ss.begin(9600);
+
+  // Start the default 9600
+  ss.begin(9600); 
+  delay(500);
+
+  // Change the update rate to 5Hz (Keep 9600 baud)
+  // Tells the GPS to calculate position every 200ms
+  ss.print("$PMTK220,200*2C\r\n"); 
+  delay(100);
+
+  // Tell the GPS to stop sending unnecessary data to save bandwidth
+  // (Disables everything except RMC and GGA sentences)
+  ss.print("$PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*28\r\n");
+
   Wire.begin(SDA_PIN, SCL_PIN);
-  
   pinMode(LED_PIN, OUTPUT);
   pinMode(REC_SWITCH, INPUT_PULLUP);
   pinMode(WIFI_SWITCH, INPUT_PULLUP);
@@ -165,7 +177,8 @@ void loop() {
     lastLogTime = millis();
     float relAlt = bmp.readAltitude(1013.25) - altBaseline;
     Serial.printf("Lat: %.6f Lng: %.6f Alt: %.1fm\n", gps.location.lat(), gps.location.lng(), relAlt);
-    logFile.printf("%.6f,%.6f,%.1f\n", gps.location.lng(), gps.location.lat(), relAlt);
+    // Change \n to a space so the KML is valid
+    logFile.printf("%.6f,%.6f,%.1f ", gps.location.lng(), gps.location.lat(), relAlt);
     logFile.flush();
   }
 
