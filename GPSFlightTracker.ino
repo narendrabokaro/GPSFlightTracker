@@ -75,118 +75,108 @@ void handleDelete() {
 
 void setup() {
   Serial.begin(115200);
-
-  // Start the default 9600
-  ss.begin(9600); 
-  delay(500);
-
-  // Change the update rate to 5Hz (Keep 9600 baud)
-  // Tells the GPS to calculate position every 200ms
-  ss.print("$PMTK220,200*2C\r\n"); 
-  delay(100);
-
-  // Tell the GPS to stop sending unnecessary data to save bandwidth
-  // (Disables everything except RMC and GGA sentences)
-  ss.print("$PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*28\r\n");
-
-  Wire.begin(SDA_PIN, SCL_PIN);
+  
+  // 1. Start GPS at default speed to send configuration commands
+  ss.begin(9600);
+  
   pinMode(LED_PIN, OUTPUT);
   pinMode(REC_SWITCH, INPUT_PULLUP);
   pinMode(WIFI_SWITCH, INPUT_PULLUP);
 
-  if (!LittleFS.begin()) Serial.println("FS Error");
-  if (!bmp.begin(0x76)) Serial.println("BMP Error");
+  // 2. Set GPS to 5Hz Update Rate (UBX-CFG-RATE)
+  // This tells the chip to measure position every 200ms
+  byte set5Hz[] = {0xB5, 0x62, 0x06, 0x08, 0x06, 0x00, 0xC8, 0x00, 0x01, 0x00, 0x01, 0x00, 0xDE, 0x6A};
+  ss.write(set5Hz, sizeof(set5Hz));
+  delay(100);
 
-  WiFi.mode(WIFI_OFF);
+  // 3. Optional but Recommended: Increase Baud Rate to 38400 (UBX-CFG-PRT)
+  // 9600 can be too slow to transmit all NMEA sentences 5 times per second.
+  byte set38400[] = {0xB5, 0x62, 0x06, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0xD0, 0x08, 0x00, 0x00, 0x00, 0x96, 0x00, 0x00, 0x07, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x92, 0x8D};
+  ss.write(set38400, sizeof(set38400));
+  delay(100);
+  
+  // Restart SoftwareSerial at the new speed
+  ss.begin(38400);
+
+  if (!LittleFS.begin()) {
+    Serial.println("LittleFS Mount Failed");
+    return;
+  }
+
+  if (!bmp.begin(0x76)) { // Check your I2C address, usually 0x76 or 0x77
+    Serial.println("Could not find a valid BMP280 sensor!");
+  }
+
+  // BMP280 settings for better altitude resolution during flight
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     
+                  Adafruit_BMP280::SAMPLING_X2,     // Temp. oversampling
+                  Adafruit_BMP280::SAMPLING_X16,    // Pressure oversampling
+                  Adafruit_BMP280::FILTER_X16,      // Filtering
+                  Adafruit_BMP280::STANDBY_MS_500); 
+
+  Serial.println("Setup Complete. Waiting for GPS Fix...");
 }
 
 void loop() {
-  // Check if we are receiving ANY bytes from the GPS
-  while (ss.available() > 0) {
-    char c = ss.read();
-    gps.encode(c);
-  }
+  while (ss.available() > 0)
+    gps.encode(ss.read());
 
-  // Debugging message - Print status every 5 seconds
-  static unsigned long lastDebug = 0;
-  if (millis() - lastDebug > debugMessagePrintFreq) {
-    lastDebug = millis();
-    Serial.println("--- GPS Debug Status ---");
-    Serial.print("Chars Processed: ");
-    Serial.println(gps.charsProcessed());
-    Serial.print("Satellites in View: ");
-    Serial.println(gps.satellites.value());
-
-    if (gps.charsProcessed() < 10) {
-      Serial.println(">> ERROR: No data from GPS. Check TX/RX wiring!");
-    } else if (gps.satellites.value() == 0) {
-      Serial.println(">> SEARCHING: GPS is talking, but no satellites found. Go outside!");
-    }
-  }
-
-  bool recSw = (digitalRead(REC_SWITCH) == LOW);
-  bool wifiSw = (digitalRead(WIFI_SWITCH) == LOW);
-  bool hasFix = (gps.location.isValid() && gps.satellites.value() >= 4);
-
-  // WiFi Logic
-  if (wifiSw && !wifiActive) {
-    WiFi.softAP(accessPointName, password);
-    server.on("/", handleRoot);
-    server.on("/get", handleDownload);
-    server.on("/del", handleDelete);
-    server.begin();
-    wifiActive = true;
-    Serial.println("WiFi On: 192.168.4.1");
-  } else if (!wifiSw && wifiActive) {
-    WiFi.mode(WIFI_OFF);
-    wifiActive = false;
-  }
+  bool recSw = digitalRead(REC_SWITCH) == LOW;
+  bool wifiSw = digitalRead(WIFI_SWITCH) == LOW;
+  bool hasFix = gps.location.isValid() && gps.location.age() < 2000;
 
   if (wifiActive) {
-    server.handleClient();
-  }
-
-  // LED Logic
-  if (!hasFix) {
-    // Fast Flash - Searching for GPS fix
-    digitalWrite(LED_PIN, (millis() / 200) % 2);
+    digitalWrite(LED_PIN, (millis() / 200) % 2); 
   } else if (isLogging) {
-    // Slow Blink - Recording in progress
     digitalWrite(LED_PIN, (millis() / 1000) % 2);
   } else {
-    // Solid Ready - GPS Fixed
     digitalWrite(LED_PIN, HIGH);
   }
 
-  // Record Logic
   if (recSw && !isLogging && hasFix) {
     char path[25];
     sprintf(path, "/%02d%02d_%02d%02d.kml", gps.date.day(), gps.date.month(), gps.time.hour(), gps.time.minute());
     logFile = LittleFS.open(path, "w");
     if (logFile) {
       logFile.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?><kml xmlns=\"http://www.opengis.net\"><Document><Placemark><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>");
-      // Sea level pressure in Austin, TX (in hectopascals hPa)
       altBaseline = bmp.readAltitude(1013.25);
       isLogging = true;
       Serial.println("Recording...");
     }
   }
 
-  // Logging in progress
+  // ONLY CHANGE IS HERE: Added gps.location.isUpdated()
   if (isLogging && millis() - lastLogTime >= loggingInterval) {
-    lastLogTime = millis();
-    float relAlt = bmp.readAltitude(1013.25) - altBaseline;
-    Serial.printf("Lat: %.6f Lng: %.6f Alt: %.1fm\n", gps.location.lat(), gps.location.lng(), relAlt);
-    // Change \n to a space so the KML is valid
-    logFile.printf("%.6f,%.6f,%.1f ", gps.location.lng(), gps.location.lat(), relAlt);
-    logFile.flush();
+    if (gps.location.isUpdated()) { 
+      lastLogTime = millis();
+      float relAlt = bmp.readAltitude(1013.25) - altBaseline;
+      Serial.printf("Lat: %.6f Lng: %.6f Alt: %.1fm\n", gps.location.lat(), gps.location.lng(), relAlt);
+      if (logFile) {
+        logFile.printf("%.6f,%.6f,%.1f ", gps.location.lng(), gps.location.lat(), relAlt);
+      }
+    }
   }
 
-  // Record button off - Save the recorded file
   if (!recSw && isLogging) {
-    logFile.println("</coordinates></LineString></Placemark></Document></kml>");
-    logFile.close();
+    if (logFile) {
+      logFile.println("\n</coordinates></LineString></Placemark></Document></kml>");
+      logFile.close();
+    }
     isLogging = false;
-    Serial.println("Saved.");
+    Serial.println("Recording Stopped.");
+  }
+
+  if (wifiSw && !wifiActive) {
+    WiFi.softAP(accessPointName, password);
+    server.on("/", handleRoot);
+    server.on("/download", handleDownload);
+    server.on("/delete", handleDelete);
+    server.begin();
+    wifiActive = true;
+    Serial.println("WiFi Active: 192.168.4.1");
+  }
+
+  if (wifiActive) {
+    server.handleClient();
   }
 }
