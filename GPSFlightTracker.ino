@@ -83,14 +83,12 @@ void setup() {
   pinMode(REC_SWITCH, INPUT_PULLUP);
   pinMode(WIFI_SWITCH, INPUT_PULLUP);
 
-  // 2. Set GPS to 5Hz Update Rate (UBX-CFG-RATE)
-  // This tells the chip to measure position every 200ms
+  // 2. Set GPS to 5Hz Update Rate (UBX-CFG-RATE) - measure position every 200ms
   byte set5Hz[] = {0xB5, 0x62, 0x06, 0x08, 0x06, 0x00, 0xC8, 0x00, 0x01, 0x00, 0x01, 0x00, 0xDE, 0x6A};
   ss.write(set5Hz, sizeof(set5Hz));
   delay(100);
 
-  // 3. Optional but Recommended: Increase Baud Rate to 38400 (UBX-CFG-PRT)
-  // 9600 can be too slow to transmit all NMEA sentences 5 times per second.
+  // 3. Increase Baud Rate to 38400 (UBX-CFG-PRT)
   byte set38400[] = {0xB5, 0x62, 0x06, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0xD0, 0x08, 0x00, 0x00, 0x00, 0x96, 0x00, 0x00, 0x07, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x92, 0x8D};
   ss.write(set38400, sizeof(set38400));
   delay(100);
@@ -103,7 +101,8 @@ void setup() {
     return;
   }
 
-  if (!bmp.begin(0x76)) { // Check your I2C address, usually 0x76 or 0x77
+  // Check your I2C address, usually 0x76 or 0x77
+  if (!bmp.begin(0x76)) {
     Serial.println("Could not find a valid BMP280 sensor!");
   }
 
@@ -145,7 +144,6 @@ void loop() {
     }
   }
 
-  // ONLY CHANGE IS HERE: Added gps.location.isUpdated()
   if (isLogging && millis() - lastLogTime >= loggingInterval) {
     if (gps.location.isUpdated()) { 
       lastLogTime = millis();
